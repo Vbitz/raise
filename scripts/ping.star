@@ -1,0 +1,1 @@
+client.remote().ping()
