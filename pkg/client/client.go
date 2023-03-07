@@ -120,6 +120,24 @@ func (c *Client) Remote(name string) (*Remote, error) {
 	}, nil
 }
 
+func (c *Client) GetWorkers() ([]string, error) {
+	// Lazily connect to the server when we get our first client connection.
+	if c.rpcConn == nil {
+		err := c.Connect()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var resp proto.GetWorkersResp
+	err := c.rpcClient.Call(proto.Client_GetWorkers, proto.GetWorkersReq{}, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Workers, nil
+}
+
 // Attr implements starlark.HasAttrs
 func (c *Client) Attr(name string) (starlark.Value, error) {
 	if name == "remote" {
@@ -139,6 +157,26 @@ func (c *Client) Attr(name string) (starlark.Value, error) {
 
 			return c.Remote(name)
 		}), nil
+	} else if name == "get_workers" {
+		return starlark.NewBuiltin("Client.get_workers", func(
+			thread *starlark.Thread,
+			fn *starlark.Builtin,
+			args starlark.Tuple,
+			kwargs []starlark.Tuple,
+		) (starlark.Value, error) {
+			workerList, err := c.GetWorkers()
+			if err != nil {
+				return starlark.None, err
+			}
+
+			var ret []starlark.Value
+
+			for _, name := range workerList {
+				ret = append(ret, starlark.String(name))
+			}
+
+			return starlark.NewList(ret), nil
+		}), nil
 		// } else if name == "read_file" {
 		// } else if name == "write_file" {
 	} else {
@@ -147,7 +185,7 @@ func (c *Client) Attr(name string) (starlark.Value, error) {
 }
 
 func (*Client) AttrNames() []string {
-	return []string{"remote", "read_file", "write_file"}
+	return []string{"remote", "get_workers", "read_file", "write_file"}
 }
 
 func (*Client) String() string       { return "Client" }

@@ -8,6 +8,7 @@ var (
 	Common_Ping        = "Common_Ping"
 	Control_Hello      = "Control_Hello"
 	Common_SendMessage = "Common_SendMessage"
+	Client_GetWorkers  = "Client_GetWorkers"
 )
 
 type PingReq struct {
@@ -25,6 +26,13 @@ type SendMessageReq struct {
 type SendMessageResp struct {
 }
 
+type GetWorkersReq struct {
+}
+
+type GetWorkersResp struct {
+	Workers []string
+}
+
 type HelloReq struct {
 	Name string
 }
@@ -40,6 +48,7 @@ type ClientService interface {
 	CommonService
 
 	SendMessage(client *rpc2.Client, req SendMessageReq, resp *SendMessageResp) error
+	GetWorkers(client *rpc2.Client, req GetWorkersReq, resp *GetWorkersResp) error
 }
 
 // Worker -> Server Communication

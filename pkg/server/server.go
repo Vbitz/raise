@@ -23,8 +23,17 @@ type Client struct {
 	certificate *x509.Certificate
 }
 
+// GetWorkers implements proto.ClientService
+func (c *Client) GetWorkers(client *rpc2.Client, req proto.GetWorkersReq, resp *proto.GetWorkersResp) error {
+	*resp = proto.GetWorkersResp{}
+	for _, worker := range c.server.connectedWorkers {
+		resp.Workers = append(resp.Workers, worker.name)
+	}
+	return nil
+}
+
 // SendMessage implements proto.ClientService
-func (*Client) SendMessage(client *rpc2.Client, req proto.SendMessageReq, resp *proto.SendMessageResp) error {
+func (c *Client) SendMessage(client *rpc2.Client, req proto.SendMessageReq, resp *proto.SendMessageResp) error {
 	panic("unimplemented")
 }
 
@@ -203,6 +212,8 @@ func (s *Server) handleClient(w http.ResponseWriter, r *http.Request) {
 	server := rpc2.NewServer()
 
 	server.Handle(proto.Common_Ping, client.Ping)
+	server.Handle(proto.Common_SendMessage, client.SendMessage)
+	server.Handle(proto.Client_GetWorkers, client.GetWorkers)
 
 	server.ServeConn(conn)
 }
