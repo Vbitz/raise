@@ -6,22 +6,28 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"os"
 
-	"capnproto.org/go/capnp/v3/rpc"
 	"github.com/Vbitz/raise/v2/pkg/proto"
+	"github.com/cenkalti/rpc2"
 	"github.com/gobwas/ws"
 	"go.starlark.net/starlark"
-	wsproto "zenhack.net/go/websocket-capnp"
 )
 
 type Client struct {
 	serverAddress     string
 	serverCertificate string
-	rpcConn           *rpc.Conn
-	rpcClient         *proto.ClientService
+	rpcClient         *rpc2.Client
+	rpcConn           net.Conn
 	clientCertificate string
 	clientKey         string
+}
+
+// Ping implements proto.CommonService
+func (c *Client) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
+	*resp = proto.PingResp{}
+	return nil
 }
 
 func (c *Client) Connect() error {
@@ -79,20 +85,18 @@ func (c *Client) Connect() error {
 		return err
 	}
 
-	transport := wsproto.NewTransport(conn, false)
-	c.rpcConn = rpc.NewConn(transport, nil)
+	c.rpcConn = conn
 
-	client := proto.ClientService(c.rpcConn.Bootstrap(context.Background()))
+	c.rpcClient = rpc2.NewClient(c.rpcConn)
 
-	c.rpcClient = &client
+	go c.rpcClient.Run()
+
+	c.rpcClient.Handle(proto.Common_Ping, c.Ping)
 
 	return nil
 }
 
 func (c *Client) Close() error {
-	if c.rpcClient != nil {
-		c.rpcClient.Release()
-	}
 	if c.rpcConn != nil {
 		if err := c.rpcConn.Close(); err != nil {
 			return err
@@ -103,7 +107,7 @@ func (c *Client) Close() error {
 
 func (c *Client) Remote(name string) (*Remote, error) {
 	// Lazily connect to the server when we get our first client connection.
-	if c.rpcClient == nil {
+	if c.rpcConn == nil {
 		err := c.Connect()
 		if err != nil {
 			return nil, err
@@ -157,6 +161,8 @@ func (*Client) Hash() (uint32, error) {
 var (
 	_ starlark.Value    = &Client{}
 	_ starlark.HasAttrs = &Client{}
+
+	_ proto.CommonService = &Client{}
 )
 
 func NewClient(serverAddress string, serverCertificate string, clientCertificate string, clientKey string) *Client {

@@ -1,7 +1,6 @@
 package server
 
 import (
-	context "context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -10,12 +9,9 @@ import (
 	"net"
 	"net/http"
 
-	"capnproto.org/go/capnp/v3"
-	"capnproto.org/go/capnp/v3/rpc"
-	"capnproto.org/go/capnp/v3/rpc/transport"
 	"github.com/Vbitz/raise/v2/pkg/proto"
+	"github.com/cenkalti/rpc2"
 	"github.com/gobwas/ws"
-	wsproto "zenhack.net/go/websocket-capnp"
 )
 
 type Client struct {
@@ -23,8 +19,63 @@ type Client struct {
 	// Client certificate as Base64 encoded DER format.
 	CertificateString string
 
+	server      *Server
 	certificate *x509.Certificate
 }
+
+// Ping implements proto.ClientService
+func (*Client) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
+	if req.Name != "" {
+		return fmt.Errorf("not implemented")
+	}
+
+	*resp = proto.PingResp{}
+
+	return nil
+}
+
+var (
+	_ proto.ClientService = &Client{}
+)
+
+type Worker struct {
+	server    *Server
+	addr      string
+	rpcServer *rpc2.Server
+	rpcClient *rpc2.Client
+}
+
+// Hello implements proto.ControlService
+func (w *Worker) Hello(client *rpc2.Client, req proto.HelloReq, resp *proto.HelloResp) error {
+	var pingResp proto.PingResp
+
+	err := client.Call(proto.Common_Ping, proto.PingReq{}, &pingResp)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("worker from %s registered", w.addr)
+
+	w.rpcClient = client
+
+	return nil
+}
+
+// Ping implements proto.ControlService
+func (*Worker) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
+	if req.Name != "" {
+		return fmt.Errorf("not implemented")
+	}
+
+	*resp = proto.PingResp{}
+
+	return nil
+}
+
+var (
+	_ proto.ClientService  = &Worker{}
+	_ proto.ControlService = &Worker{}
+)
 
 type Server struct {
 	addr             string
@@ -33,25 +84,7 @@ type Server struct {
 	permittedClients []*Client
 	mux              *http.ServeMux
 	upgrader         ws.HTTPUpgrader
-}
-
-// Ping implements proto.ClientService_Server
-func (*Server) Ping(ctx context.Context, m proto.Service_ping) error {
-	name, err := m.Args().Name()
-	if err != nil {
-		return err
-	}
-
-	if name != "" {
-		return fmt.Errorf("not implemented")
-	}
-
-	_, err = m.AllocResults()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	connectedWorkers []*Worker
 }
 
 func (s *Server) authenticateClient(certs []*x509.Certificate) *Client {
@@ -122,53 +155,43 @@ func (s *Server) handleClient(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("client connected from: %s", r.RemoteAddr)
 
-	codec, err := wsproto.UpgradeHTTP(s.upgrader, r, w)
+	conn, _, _, err := s.upgrader.Upgrade(r, w)
 	if err != nil {
 		log.Printf("error creating codec: %v", err)
 	}
-	defer codec.Close()
-
-	protoClient := proto.ClientService_ServerToClient(s)
-
-	conn := rpc.NewConn(transport.New(codec), &rpc.Options{
-		// The BootstrapClient is the RPC interface that will be made available
-		// to the remote endpoint by default.
-		BootstrapClient: capnp.Client(protoClient),
-	})
 	defer conn.Close()
 
-	select {
-	case <-conn.Done():
-		return
-	}
+	client.server = s
+
+	server := rpc2.NewServer()
+
+	server.Handle(proto.Common_Ping, client.Ping)
+
+	server.ServeConn(conn)
 }
 
 func (s *Server) handleWorker(w http.ResponseWriter, r *http.Request) {
-	codec, err := wsproto.UpgradeHTTP(s.upgrader, r, w)
+	log.Printf("worker connected from: %s", r.RemoteAddr)
+
+	conn, _, _, err := s.upgrader.Upgrade(r, w)
 	if err != nil {
 		log.Printf("error creating codec: %v", err)
 	}
-	defer codec.Close()
-
-	protoClient := proto.WorkerService_ServerToClient(s)
-
-	conn := rpc.NewConn(transport.New(codec), &rpc.Options{
-		// The BootstrapClient is the RPC interface that will be made available
-		// to the remote endpoint by default.
-		BootstrapClient: capnp.Client(protoClient),
-	})
 	defer conn.Close()
 
-	select {
-	case <-conn.Done():
-		return
+	worker := &Worker{
+		server:    s,
+		addr:      r.RemoteAddr,
+		rpcServer: rpc2.NewServer(),
 	}
-}
 
-var (
-	_ proto.ClientService_Server = &Server{}
-	_ proto.WorkerService_Server = &Server{}
-)
+	s.connectedWorkers = append(s.connectedWorkers, worker)
+
+	worker.rpcServer.Handle(proto.Common_Ping, worker.Ping)
+	worker.rpcServer.Handle(proto.Control_Hello, worker.Hello)
+
+	worker.rpcServer.ServeConn(conn)
+}
 
 func NewServer(addr string, certFile string, keyFile string) *Server {
 	s := &Server{

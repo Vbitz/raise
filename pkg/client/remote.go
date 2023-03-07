@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/Vbitz/raise/v2/pkg/proto"
@@ -13,13 +12,10 @@ type Remote struct {
 	name   string
 }
 
-func (r *Remote) Ping() error {
-	res, release := r.client.rpcClient.Ping(context.Background(), func(s proto.Service_ping_Params) error {
-		return nil
-	})
-	defer release()
+func (r *Remote) Ping(name string) error {
+	var resp proto.PingResp
 
-	_, err := res.Struct()
+	err := r.client.rpcClient.Call(proto.Common_Ping, proto.PingReq{}, &resp)
 	if err != nil {
 		return err
 	}
@@ -35,7 +31,7 @@ func (r *Remote) Attr(name string) (starlark.Value, error) {
 			args starlark.Tuple,
 			kwargs []starlark.Tuple,
 		) (starlark.Value, error) {
-			err := r.Ping()
+			err := r.Ping(r.name)
 			if err != nil {
 				return starlark.None, err
 			}
