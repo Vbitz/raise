@@ -2,9 +2,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"os"
+	"path"
 	"strings"
 
 	"github.com/Vbitz/raise/v2/pkg/server"
@@ -17,8 +19,51 @@ var (
 	clientList = flag.String("clientList", "", "A file containing a list of client keys to trust.")
 )
 
+type ConfigFile struct {
+	Address         string
+	CertificateFile string
+	KeyFile         string
+	ClientListFile  string
+}
+
+func loadConfig() error {
+	exec, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	execDir := path.Dir(exec)
+
+	configPath := path.Join(execDir, "server.json")
+
+	configContent, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+
+	var config ConfigFile
+
+	err = json.Unmarshal(configContent, &config)
+	if err != nil {
+		return err
+	}
+
+	// Set config values.
+	*addr = config.Address
+	*certFile = config.CertificateFile
+	*keyFile = config.KeyFile
+	*clientList = config.ClientListFile
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
+
+	err := loadConfig()
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
 
 	svr := server.NewServer(*addr, *certFile, *keyFile)
 

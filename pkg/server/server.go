@@ -23,15 +23,32 @@ type Client struct {
 	certificate *x509.Certificate
 }
 
+// SendMessage implements proto.ClientService
+func (*Client) SendMessage(client *rpc2.Client, req proto.SendMessageReq, resp *proto.SendMessageResp) error {
+	panic("unimplemented")
+}
+
 // Ping implements proto.ClientService
-func (*Client) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
+func (c *Client) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
 	if req.Name != "" {
-		return fmt.Errorf("not implemented")
+		worker := c.server.getWorker(req.Name)
+		if worker == nil {
+			return fmt.Errorf("worker %s not connected or non existing", req.Name)
+		}
+
+		err := worker.rpcClient.Call(proto.Common_Ping, proto.PingReq{}, &resp)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	} else {
+		*resp = proto.PingResp{
+			Message: "Hello from server",
+		}
+
+		return nil
 	}
-
-	*resp = proto.PingResp{}
-
-	return nil
 }
 
 var (
@@ -40,6 +57,7 @@ var (
 
 type Worker struct {
 	server    *Server
+	name      string
 	addr      string
 	rpcServer *rpc2.Server
 	rpcClient *rpc2.Client
@@ -54,26 +72,36 @@ func (w *Worker) Hello(client *rpc2.Client, req proto.HelloReq, resp *proto.Hell
 		return err
 	}
 
-	log.Printf("worker from %s registered", w.addr)
+	log.Printf("worker %s from %s registered", req.Name, w.addr)
 
 	w.rpcClient = client
+	w.name = req.Name
 
 	return nil
 }
 
 // Ping implements proto.ControlService
-func (*Worker) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
+func (w *Worker) Ping(client *rpc2.Client, req proto.PingReq, resp *proto.PingResp) error {
 	if req.Name != "" {
-		return fmt.Errorf("not implemented")
+		worker := w.server.getWorker(req.Name)
+		if worker == nil {
+			return fmt.Errorf("worker %s not connected or non existing", req.Name)
+		}
+
+		err := worker.rpcClient.Call(proto.Common_Ping, proto.PingReq{}, &resp)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	} else {
+		*resp = proto.PingResp{}
+
+		return nil
 	}
-
-	*resp = proto.PingResp{}
-
-	return nil
 }
 
 var (
-	_ proto.ClientService  = &Worker{}
 	_ proto.ControlService = &Worker{}
 )
 
@@ -85,6 +113,15 @@ type Server struct {
 	mux              *http.ServeMux
 	upgrader         ws.HTTPUpgrader
 	connectedWorkers []*Worker
+}
+
+func (s *Server) getWorker(name string) *Worker {
+	for _, worker := range s.connectedWorkers {
+		if worker.name == name {
+			return worker
+		}
+	}
+	return nil
 }
 
 func (s *Server) authenticateClient(certs []*x509.Certificate) *Client {

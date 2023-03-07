@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"time"
 
 	"github.com/Vbitz/raise/v2/pkg/worker"
 )
@@ -14,13 +15,13 @@ import (
 var (
 	serverAddress     = flag.String("server", "", "The address of the server to connect to.")
 	serverCertificate = flag.String("cert", "", "The certificate of the server to connect to.")
+	name              = flag.String("name", "", "The name the worker identifies to the server.")
 )
 
 type ConfigFile struct {
-	ServerAddress         string
-	ServerCertificate     string
-	ClientCertificatePath string
-	ClientKeyPath         string
+	ServerAddress     string
+	ServerCertificate string
+	WorkerName        string
 }
 
 func loadConfig() error {
@@ -48,6 +49,7 @@ func loadConfig() error {
 	// Set config values.
 	*serverAddress = config.ServerAddress
 	*serverCertificate = config.ServerCertificate
+	*name = config.WorkerName
 
 	return nil
 }
@@ -60,10 +62,14 @@ func main() {
 		log.Fatalf("failed to load configuration: %v", err)
 	}
 
-	worker := worker.NewWorker(*serverAddress, *serverCertificate)
+	worker := worker.NewWorker(*serverAddress, *serverCertificate, *name)
 
-	err = worker.Connect()
-	if err != nil {
-		log.Fatalf("failed to connect: %v", err)
+	for {
+		log.Printf("attempting to connect to: %s", *serverAddress)
+		err = worker.Connect()
+		if err != nil {
+			log.Printf("failed to connect: %v", err)
+			time.Sleep(10 * time.Second)
+		}
 	}
 }

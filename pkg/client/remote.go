@@ -12,15 +12,15 @@ type Remote struct {
 	name   string
 }
 
-func (r *Remote) Ping(name string) error {
+func (r *Remote) Ping(name string) (string, error) {
 	var resp proto.PingResp
 
-	err := r.client.rpcClient.Call(proto.Common_Ping, proto.PingReq{}, &resp)
+	err := r.client.rpcClient.Call(proto.Common_Ping, proto.PingReq{Name: name}, &resp)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return resp.Message, nil
 }
 
 func (r *Remote) Attr(name string) (starlark.Value, error) {
@@ -31,12 +31,12 @@ func (r *Remote) Attr(name string) (starlark.Value, error) {
 			args starlark.Tuple,
 			kwargs []starlark.Tuple,
 		) (starlark.Value, error) {
-			err := r.Ping(r.name)
+			msg, err := r.Ping(r.name)
 			if err != nil {
 				return starlark.None, err
 			}
 
-			return starlark.None, nil
+			return starlark.String(msg), nil
 		}), nil
 	} else {
 		return nil, nil

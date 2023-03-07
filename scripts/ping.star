@@ -1,1 +1,1 @@
-client.remote().ping()
+print(client.remote("testing").ping())
