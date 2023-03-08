@@ -91,7 +91,12 @@ func main() {
 
 	engine := star.NewEngine()
 
-	err = engine.RunFile(client, filename, fileContents)
+	remote, err := client.Remote("testing")
+	if err != nil {
+		log.Fatalf("failed to get client remote: %v", err)
+	}
+
+	err = engine.RunFile(client, remote, filename, fileContents)
 	if err != nil {
 		log.Fatalf("error running script: %v", err)
 	}

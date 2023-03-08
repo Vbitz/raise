@@ -130,7 +130,7 @@ func main() {
 
 	engine := star.NewEngine()
 
-	err = engine.RunFile(client, filename, fileContents)
+	err = engine.RunFile(client, nil, filename, fileContents)
 	if err != nil {
 		log.Fatalf("error running script: %v", err)
 	}

@@ -23,6 +23,25 @@ type Client struct {
 	certificate *x509.Certificate
 }
 
+// GetInfo implements proto.ClientService
+func (c *Client) GetInfo(client *rpc2.Client, req proto.GetInfoReq, resp *proto.GetInfoResp) error {
+	if req.Name == "" {
+		return fmt.Errorf("cannot get info of server")
+	}
+
+	worker := c.server.getWorker(req.Name)
+	if worker == nil {
+		return fmt.Errorf("worker %s not connected or non existing", req.Name)
+	}
+
+	err := worker.rpcClient.Call(proto.Common_GetInfo, req, &resp)
+	if err != nil {
+		return fmt.Errorf("failed to call GetInfo on worker: %v", err)
+	}
+
+	return nil
+}
+
 // GetWorkers implements proto.ClientService
 func (c *Client) GetWorkers(client *rpc2.Client, req proto.GetWorkersReq, resp *proto.GetWorkersResp) error {
 	*resp = proto.GetWorkersResp{}
@@ -34,7 +53,21 @@ func (c *Client) GetWorkers(client *rpc2.Client, req proto.GetWorkersReq, resp *
 
 // SendMessage implements proto.ClientService
 func (c *Client) SendMessage(client *rpc2.Client, req proto.SendMessageReq, resp *proto.SendMessageResp) error {
-	panic("unimplemented")
+	if req.Target == "" {
+		return fmt.Errorf("cannot send message to server")
+	}
+
+	worker := c.server.getWorker(req.Target)
+	if worker == nil {
+		return fmt.Errorf("worker %s not connected or non existing", req.Target)
+	}
+
+	err := worker.rpcClient.Call(proto.Common_SendMessage, req, &resp)
+	if err != nil {
+		return fmt.Errorf("failed to call SendMessage on worker: %v", err)
+	}
+
+	return nil
 }
 
 // Ping implements proto.ClientService
@@ -214,6 +247,7 @@ func (s *Server) handleClient(w http.ResponseWriter, r *http.Request) {
 	server.Handle(proto.Common_Ping, client.Ping)
 	server.Handle(proto.Common_SendMessage, client.SendMessage)
 	server.Handle(proto.Client_GetWorkers, client.GetWorkers)
+	server.Handle(proto.Common_GetInfo, client.GetInfo)
 
 	server.ServeConn(conn)
 }

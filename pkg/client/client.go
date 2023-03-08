@@ -177,8 +177,54 @@ func (c *Client) Attr(name string) (starlark.Value, error) {
 
 			return starlark.NewList(ret), nil
 		}), nil
-		// } else if name == "read_file" {
-		// } else if name == "write_file" {
+	} else if name == "read_file" {
+		return starlark.NewBuiltin("Remote.read_file", func(
+			thread *starlark.Thread,
+			fn *starlark.Builtin,
+			args starlark.Tuple,
+			kwargs []starlark.Tuple,
+		) (starlark.Value, error) {
+			var (
+				filename string
+			)
+			if err := starlark.UnpackArgs("Remote.read_file", args, kwargs,
+				"filename", &filename,
+			); err != nil {
+				return starlark.None, err
+			}
+
+			content, err := os.ReadFile(filename)
+			if err != nil {
+				return starlark.None, err
+			}
+
+			return starlark.String(content), nil
+		}), nil
+	} else if name == "write_file" {
+		return starlark.NewBuiltin("Remote.write_file", func(
+			thread *starlark.Thread,
+			fn *starlark.Builtin,
+			args starlark.Tuple,
+			kwargs []starlark.Tuple,
+		) (starlark.Value, error) {
+			var (
+				filename string
+				content  string
+			)
+			if err := starlark.UnpackArgs("Remote.write_file", args, kwargs,
+				"filename", &filename,
+				"content", &content,
+			); err != nil {
+				return starlark.None, err
+			}
+
+			err := os.WriteFile(filename, []byte(content), os.ModePerm)
+			if err != nil {
+				return starlark.None, err
+			}
+
+			return starlark.None, nil
+		}), nil
 	} else {
 		return nil, nil
 	}

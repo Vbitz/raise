@@ -14,12 +14,15 @@ func (e *StarEngine) newThread(name string) *starlark.Thread {
 	return &starlark.Thread{Name: name}
 }
 
-func (e *StarEngine) RunFile(client *client.Client, filename string, fileContents []byte) error {
+func (e *StarEngine) RunFile(client *client.Client, remote *client.Remote, filename string, fileContents []byte) error {
 	thread := e.newThread(filename)
 
 	builtin := builtin.Globals
 
 	builtin["client"] = client
+	if remote != nil {
+		builtin["remote"] = remote
+	}
 
 	_, err := starlark.ExecFile(thread, filename, fileContents, builtin)
 	if err != nil {
