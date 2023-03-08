@@ -37,7 +37,7 @@ func (c *Client) Connect() error {
 
 	pemBytes, err := base64.StdEncoding.DecodeString(c.serverCertificate)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to decode server certificate: %v", err)
 	}
 
 	ok := certPool.AppendCertsFromPEM(pemBytes)
@@ -82,7 +82,7 @@ func (c *Client) Connect() error {
 
 	conn, _, _, err := dialer.Dial(context.Background(), c.serverAddress+"/client")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial server: %v", err)
 	}
 
 	c.rpcConn = conn
