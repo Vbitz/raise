@@ -13,6 +13,7 @@ import (
 	"path"
 
 	"github.com/Vbitz/raise/v2/pkg/client"
+	"github.com/Vbitz/raise/v2/pkg/common"
 	"github.com/Vbitz/raise/v2/pkg/security"
 	"github.com/Vbitz/raise/v2/pkg/star"
 )
@@ -22,6 +23,7 @@ var (
 	serverCertificate = flag.String("serverCertificate", "", "The certificate of the server to connect to. The certificate is base64 encoded in DER format.")
 	clientCertificate = flag.String("clientCertificate", "", "The certificate the client uses to authenticate to the server.")
 	clientKey         = flag.String("clientKey", "", "The private key the client uses to authenticate to the server.")
+	version           = flag.Bool("version", false, "Print the current version and exit.")
 )
 
 type ConfigFile struct {
@@ -85,6 +87,10 @@ func writeCertAndKey(certBytes []byte, privBytes []byte) error {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		log.Printf("%s", common.Commit)
+	}
 
 	err := loadConfig()
 	if err != nil {

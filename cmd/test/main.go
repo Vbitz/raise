@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Vbitz/raise/v2/pkg/client"
+	"github.com/Vbitz/raise/v2/pkg/common"
 	"github.com/Vbitz/raise/v2/pkg/server"
 	"github.com/Vbitz/raise/v2/pkg/star"
 	"github.com/Vbitz/raise/v2/pkg/worker"
@@ -19,10 +20,15 @@ var (
 	serverKeyFile  = flag.String("serverKey", "testData/server.key", "The key file to use for HTTPS.")
 	clientCertFile = flag.String("clientCert", "build/client.crt", "The certificate the client uses.")
 	clientKeyFile  = flag.String("clientKey", "build/client.key", "The certificate the client uses.")
+	version        = flag.Bool("version", false, "Print the current version and exit.")
 )
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		log.Printf("%s", common.Commit)
+	}
 
 	filename := flag.Arg(0)
 	if filename == "" {

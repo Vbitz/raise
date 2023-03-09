@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/Vbitz/raise/v2/pkg/common"
 	"github.com/Vbitz/raise/v2/pkg/server"
 )
 
@@ -17,6 +18,7 @@ var (
 	certFile   = flag.String("cert", "", "The certificate file to use for HTTPS.")
 	keyFile    = flag.String("key", "", "The key file to use for HTTPS.")
 	clientList = flag.String("clientList", "", "A file containing a list of client keys to trust.")
+	version    = flag.Bool("version", false, "Print the current version and exit.")
 )
 
 type ConfigFile struct {
@@ -59,6 +61,10 @@ func loadConfig() error {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		log.Printf("%s", common.Commit)
+	}
 
 	err := loadConfig()
 	if err != nil {

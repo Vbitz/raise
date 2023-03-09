@@ -9,6 +9,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/Vbitz/raise/v2/pkg/common"
 	"github.com/Vbitz/raise/v2/pkg/worker"
 )
 
@@ -16,6 +17,7 @@ var (
 	serverAddress     = flag.String("server", "", "The address of the server to connect to.")
 	serverCertificate = flag.String("cert", "", "The certificate of the server to connect to.")
 	name              = flag.String("name", "", "The name the worker identifies to the server.")
+	version           = flag.Bool("version", false, "Print the current version and exit.")
 )
 
 type ConfigFile struct {
@@ -56,6 +58,10 @@ func loadConfig() error {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		log.Printf("%s", common.Commit)
+	}
 
 	err := loadConfig()
 	if err != nil {
