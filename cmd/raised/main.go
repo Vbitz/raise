@@ -81,6 +81,10 @@ func main() {
 	for _, line := range strings.Split(string(clientListContent), "\n") {
 		tokens := strings.Split(line, " ")
 
+		if len(tokens) != 2 {
+			continue
+		}
+
 		client := server.Client{
 			Name:              tokens[1],
 			CertificateString: tokens[0],

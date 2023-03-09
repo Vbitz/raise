@@ -67,6 +67,8 @@ func (c *Client) Connect() error {
 		Certificate: [][]byte{certContent},
 	}
 
+	dialer.TLSConfig.ServerName = "localhost"
+
 	dialer.TLSConfig.GetClientCertificate = func(
 		cri *tls.CertificateRequestInfo,
 	) (*tls.Certificate, error) {

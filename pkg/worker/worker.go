@@ -140,6 +140,8 @@ func (w *Worker) Connect() error {
 
 	dialer.TLSConfig = &tls.Config{}
 
+	dialer.TLSConfig.ServerName = "localhost"
+
 	dialer.TLSConfig.RootCAs = certPool
 
 	conn, _, _, err := dialer.Dial(context.Background(), w.serverAddress+"/worker")
